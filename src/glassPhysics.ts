@@ -1,19 +1,24 @@
-// Constants
 const REFRACTIVE_INDEX_AIR = 1.0;
-const REFRACTIVE_INDEX_GLASS = 1.5; // typical glass
+const REFRACTIVE_INDEX_GLASS = 1.5;
 
 // Surface function: Convex Squircle
 // Input: x (0 to 1, where 0 = edge, 1 = center/flat part)
 // Output: height of glass surface
-export function surfaceHeight(x: number): number {
-  return 1 - Math.pow(1 - x, 4) ** 0.25; // Squircle formula from article
+export function calcSurfaceHeight(x: number): number {
+  return (1 - Math.pow(1 - x, 4)) ** 0.25; // Squircle formula from article
 }
 
-// Calculate derivative (slope) at point x
 function derivative(x: number, delta = 0.001): number {
-  const y1 = surfaceHeight(x - delta);
-  const y2 = surfaceHeight(x + delta);
-  return (y2 - y1) / (2 * delta);
+  // Handle edge cases
+  if (x <= 0) return derivative(delta, delta); // Use slope near 0
+  if (x >= 1) return 0; // Flat at center
+
+  const x1 = Math.max(0, x - delta);
+  const x2 = Math.min(1, x + delta);
+  const y1 = calcSurfaceHeight(x1);
+  const y2 = calcSurfaceHeight(x2);
+
+  return (y2 - y1) / (x2 - x1);
 }
 
 // Snell's Law: Calculate refraction angle
@@ -33,7 +38,7 @@ export function calculateDisplacement(
   glassThickness: number,
 ): number {
   // Get surface height
-  const height = surfaceHeight(normalizedDistance);
+  const height = calcSurfaceHeight(normalizedDistance);
 
   // Get normal vector (perpendicular to surface)
   const slope = derivative(normalizedDistance);
@@ -127,7 +132,8 @@ export function createDisplacementMap(
         g = 128;
 
       if (distance <= radius) {
-        const normalizedDistance = distance / radius;
+        const distanceFromEdge = radius - distance;
+        const normalizedDistance = distanceFromEdge / radius;
         const sampleIndex = Math.floor(
           normalizedDistance * (data.displacements.length - 1),
         );
@@ -139,14 +145,9 @@ export function createDisplacementMap(
         const displacementX = Math.cos(angle) * normalizedMagnitude;
         const displacementY = Math.sin(angle) * normalizedMagnitude;
 
-        // ANTI-ALIASING: Smooth edge falloff
-        const edgeDistance = radius - distance;
-        const edgeWidth = 2; // pixels of smooth transition
-        const alpha = Math.min(1, edgeDistance / edgeWidth);
-
-        // Blend displacement with neutral (128) based on alpha
-        r = 128 + displacementX * 127 * alpha;
-        g = 128 + displacementY * 127 * alpha;
+        // No alpha blending - pure displacement
+        r = 128 + displacementX * 127;
+        g = 128 + displacementY * 127;
       }
 
       imageData.data[pixelIndex + 0] = r;
