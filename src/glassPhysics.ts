@@ -5,20 +5,16 @@ const REFRACTIVE_INDEX_GLASS = 1.5;
 // Input: x (0 to 1, where 0 = edge, 1 = center/flat part)
 // Output: height of glass surface
 export function calcSurfaceHeight(x: number): number {
-  return (1 - Math.pow(1 - x, 4)) ** 0.25; // Squircle formula from article
+  return (1 - Math.pow(1 - x, 2)) ** 0.5;
 }
 
-function derivative(x: number, delta = 0.001): number {
-  // Handle edge cases
-  if (x <= 0) return derivative(delta, delta); // Use slope near 0
-  if (x >= 1) return 0; // Flat at center
-
+function calcDerivative(x: number, delta = 0.001): number {
   const x1 = Math.max(0, x - delta);
   const x2 = Math.min(1, x + delta);
   const y1 = calcSurfaceHeight(x1);
   const y2 = calcSurfaceHeight(x2);
 
-  return (y2 - y1) / (x2 - x1);
+  return (y2 - y1) / (2 * delta);
 }
 
 // Snell's Law: Calculate refraction angle
@@ -41,7 +37,7 @@ export function calculateDisplacement(
   const height = calcSurfaceHeight(normalizedDistance);
 
   // Get normal vector (perpendicular to surface)
-  const slope = derivative(normalizedDistance);
+  const slope = calcDerivative(normalizedDistance);
   const normal = { x: -slope, y: 1 }; // Rotated -90°
 
   // Normalize the normal vector
@@ -88,15 +84,20 @@ export function generateDisplacementArray(
   const displacements: number[] = [];
 
   for (let i = 0; i < samples; i++) {
-    // Normalized distance from edge (0) to end of bezel (1)
     const t = i / (samples - 1);
 
-    // Only calculate displacement within bezel
-    // After bezel, displacement is 0 (flat surface)
     let displacement = 0;
     if (t <= bezelWidth) {
-      const normalizedDistance = t / bezelWidth; // Remap to 0-1 within bezel
+      const normalizedDistance = t / bezelWidth;
       displacement = calculateDisplacement(normalizedDistance, glassThickness);
+
+      // Log first few and any non-zero values
+      if (i < 5 || Math.abs(displacement) > 0.001) {
+        console.log(`Sample ${i} (t=${t.toFixed(3)}):`, {
+          normalizedDistance: normalizedDistance.toFixed(3),
+          displacement: displacement.toFixed(4),
+        });
+      }
     }
 
     displacements.push(displacement);
@@ -145,9 +146,12 @@ export function createDisplacementMap(
         const displacementX = Math.cos(angle) * normalizedMagnitude;
         const displacementY = Math.sin(angle) * normalizedMagnitude;
 
-        // No alpha blending - pure displacement
-        r = 128 + displacementX * 127;
-        g = 128 + displacementY * 127;
+        r = Math.round(128 + displacementX * 127);
+        g = Math.round(128 + displacementY * 127);
+
+        // Clamp to valid range
+        r = Math.max(0, Math.min(255, r));
+        g = Math.max(0, Math.min(255, g));
       }
 
       imageData.data[pixelIndex + 0] = r;
