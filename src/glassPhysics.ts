@@ -5,7 +5,7 @@ const REFRACTIVE_INDEX_GLASS = 1.5;
 // Input: x (0 to 1, where 0 = edge, 1 = center/flat part)
 // Output: height of glass surface
 export function calcSurfaceHeight(x: number): number {
-  return (1 - Math.pow(1 - x, 2)) ** 0.5;
+  return (1 - Math.pow(1 - x, 4)) ** 0.25;
 }
 
 function calcDerivative(x: number, delta = 0.001): number {
@@ -33,33 +33,24 @@ export function calculateDisplacement(
   normalizedDistance: number,
   glassThickness: number,
 ): number {
-  // Get surface height
   const height = calcSurfaceHeight(normalizedDistance);
-
-  // Get normal vector (perpendicular to surface)
   const slope = calcDerivative(normalizedDistance);
   const normal = { x: -slope, y: 1 }; // Rotated -90°
 
-  // Normalize the normal vector
   const length = Math.sqrt(normal.x ** 2 + normal.y ** 2);
   normal.x /= length;
   normal.y /= length;
 
-  // Incident ray is straight down (0, -1)
   const incident = { x: 0, y: -1 };
-
-  // Calculate incident angle (angle between ray and normal)
   const dotProduct = incident.x * normal.x + incident.y * normal.y;
   const incidentAngle = Math.acos(-dotProduct); // acos of dot product
 
-  // Apply Snell's law
   const refractedAngle = snellsLaw(
     incidentAngle,
     REFRACTIVE_INDEX_AIR,
     REFRACTIVE_INDEX_GLASS,
   );
 
-  // Calculate displacement
   const actualThickness = height * glassThickness;
   const displacement =
     actualThickness * Math.tan(refractedAngle - incidentAngle);
@@ -121,6 +112,7 @@ export function createDisplacementMap(
   const imageData = new ImageData(size, size);
   const center = size / 2;
 
+  const NORMALIZATION_FACTOR = 50; // Adjust this to taste
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const pixelIndex = (y * size + x) * 4;
@@ -139,17 +131,18 @@ export function createDisplacementMap(
           normalizedDistance * (data.displacements.length - 1),
         );
         const displacementMagnitude = data.displacements[sampleIndex];
+
+        // Use fixed normalization instead of data.maxDisplacement
         const normalizedMagnitude =
-          displacementMagnitude / data.maxDisplacement;
+          displacementMagnitude / NORMALIZATION_FACTOR;
 
         const angle = Math.atan2(dy, dx);
-        const displacementX = Math.cos(angle) * normalizedMagnitude;
-        const displacementY = Math.sin(angle) * normalizedMagnitude;
+        const displacementX = -Math.cos(angle) * normalizedMagnitude;
+        const displacementY = -Math.sin(angle) * normalizedMagnitude;
 
         r = Math.round(128 + displacementX * 127);
         g = Math.round(128 + displacementY * 127);
 
-        // Clamp to valid range
         r = Math.max(0, Math.min(255, r));
         g = Math.max(0, Math.min(255, g));
       }

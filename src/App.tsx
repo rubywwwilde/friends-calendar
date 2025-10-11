@@ -1,4 +1,4 @@
-import { debounce } from "@solid-primitives/scheduled"; // or implement your own
+import { debounce } from "@solid-primitives/scheduled";
 import { type Component, createEffect, createSignal, on } from "solid-js";
 
 import {
@@ -8,12 +8,12 @@ import {
 } from "./glassPhysics";
 
 const App: Component = () => {
-  // Interactive controls - these update immediately for responsive UI
+  // Interactive controls
   const [bezelWidth, setBezelWidth] = createSignal(0.3);
-  const [glassThickness, setGlassThickness] = createSignal(100);
+  const [glassThickness, setGlassThickness] = createSignal(1000);
   const [scale, setScale] = createSignal(44);
 
-  // Debounced values - these update after user stops adjusting
+  // Debounced values
   const [debouncedBezel, setDebouncedBezel] = createSignal(0.3);
   const [debouncedThickness, setDebouncedThickness] = createSignal(100);
 
@@ -25,17 +25,15 @@ const App: Component = () => {
   const circleSize = 256;
   const filterId = "liquidGlassFilter";
 
-  // Debounce the expensive parameters (bezel and thickness)
-  // Scale is cheap so we can update it immediately
+  // Debounce functions
   const debouncedUpdateBezel = debounce((value: number) => {
     setDebouncedBezel(value);
-  }, 300); // 300ms delay
+  }, 300);
 
   const debouncedUpdateThickness = debounce((value: number) => {
     setDebouncedThickness(value);
   }, 300);
 
-  // Update debounced values when sliders change
   createEffect(() => {
     debouncedUpdateBezel(bezelWidth());
   });
@@ -44,23 +42,19 @@ const App: Component = () => {
     debouncedUpdateThickness(glassThickness());
   });
 
-  // Regenerate displacement map only when debounced values change
+  // Regenerate displacement map
   createEffect(
     on([debouncedBezel, debouncedThickness], () => {
       setIsComputing(true);
 
-      // Use requestAnimationFrame to avoid blocking the UI
       requestAnimationFrame(() => {
         const data = generateDisplacementArray(
           127,
           debouncedBezel(),
           debouncedThickness(),
         );
-        const imageData = createDisplacementMap(
-          circleSize,
-          circleSize / 2,
-          data,
-        );
+        let imageData = createDisplacementMap(circleSize, circleSize / 2, data);
+
         setDataURL(imageDataToDataURL(imageData));
         setMaxDisplacement(data.maxDisplacement);
         setIsComputing(false);
@@ -77,16 +71,15 @@ const App: Component = () => {
     }),
   );
 
-  // ... rest of your component code (people management, etc.)
-
   return (
     <div>
-      {/* SVG Filter Definition */}
+      {/* SVG Filter and Pattern Definitions */}
       <svg
         color-interpolation-filters="sRGB"
         style={{ position: "absolute", width: 0, height: 0 }}
       >
         <defs>
+          {/* Displacement filter */}
           <filter
             id={filterId}
             filterUnits="objectBoundingBox"
@@ -109,11 +102,56 @@ const App: Component = () => {
               id="disp"
               in="SourceGraphic"
               in2="displacementMap"
-              scale={scale()} // Scale updates immediately
+              scale={scale()}
               xChannelSelector="R"
               yChannelSelector="G"
             />
           </filter>
+
+          {/* Animated Grid Pattern */}
+          <pattern
+            id="gridPattern"
+            x="-15"
+            y="-15"
+            width="30"
+            height="30"
+            patternUnits="userSpaceOnUse"
+          >
+            <animate
+              attributeName="x"
+              from="-15"
+              to="15"
+              dur="2s"
+              repeatCount="indefinite"
+            />
+            <animate
+              attributeName="y"
+              from="-15"
+              to="15"
+              dur="2s"
+              repeatCount="indefinite"
+            />
+            <path
+              d="M 50 0 L 0 0 0 50"
+              fill="none"
+              stroke="#D7E8E6"
+              stroke-width="3"
+              opacity="0.8"
+            />
+          </pattern>
+
+          {/* Double Gradient */}
+          <linearGradient
+            id="doubleGradient"
+            x1="0%"
+            y1="0%"
+            x2="100%"
+            y2="100%"
+          >
+            <stop offset="0%" stop-color="#4FBDBB" />
+            <stop offset="50%" stop-color="#AFBDBB" />
+            <stop offset="100%" stop-color="#DFBDBB" />
+          </linearGradient>
         </defs>
       </svg>
 
@@ -130,19 +168,20 @@ const App: Component = () => {
           background: "#000",
         }}
       >
-        {/* Moving flower image */}
-        <div
+        {/* SVG Background with Grid */}
+        <svg
           style={{
             position: "absolute",
-            width: "150%",
-            height: "150%",
-            "background-image":
-              "url(https://raw.githubusercontent.com/lucasromerodb/liquid-glass-effect-macos/refs/heads/main/assets/flowers.jpg)",
-            "background-size": "cover",
-            "background-position": "center",
-            animation: "slowPan 20s infinite alternate ease-in-out",
+            width: "100%",
+            height: "100%",
+            top: 0,
+            left: 0,
           }}
-        />
+          preserveAspectRatio="xMidYMid slice"
+        >
+          <rect width="100%" height="100%" fill="url(#doubleGradient)" />
+          <rect width="100%" height="100%" fill="url(#gridPattern)" />
+        </svg>
 
         {/* Glass Circle */}
         <div
@@ -237,7 +276,7 @@ const App: Component = () => {
             <input
               type="range"
               min="0"
-              max="0.5"
+              max="1"
               step="0.01"
               value={bezelWidth()}
               onInput={(e) => setBezelWidth(parseFloat(e.currentTarget.value))}
@@ -281,7 +320,7 @@ const App: Component = () => {
             </label>
             <input
               type="range"
-              min="10"
+              min="0"
               max="200"
               step="5"
               value={glassThickness()}
@@ -304,7 +343,7 @@ const App: Component = () => {
             </div>
           </div>
 
-          {/* Scale (no debouncing needed - cheap operation) */}
+          {/* Scale */}
           <div style={{ "margin-bottom": "20px" }}>
             <label
               style={{
@@ -353,11 +392,6 @@ const App: Component = () => {
       </div>
 
       <style>{`
-        @keyframes slowPan {
-          0% { transform: translate(-10%, -10%); }
-          100% { transform: translate(10%, 10%); }
-        }
-
         @keyframes spin {
           to { transform: rotate(360deg); }
         }
