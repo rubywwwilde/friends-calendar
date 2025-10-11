@@ -10,8 +10,13 @@ import {
 const App: Component = () => {
   // Interactive controls
   const [bezelWidth, setBezelWidth] = createSignal(0.3);
-  const [glassThickness, setGlassThickness] = createSignal(1000);
+  const [glassThickness, setGlassThickness] = createSignal(100);
   const [scale, setScale] = createSignal(44);
+  const [imageURL, setImageURL] = createSignal("");
+  const [activeImageURL, setActiveImageURL] = createSignal(
+    "https://www.nao.ac.jp/en/contents/news/science/2021/20210910-cfca-fig3-full.jpg",
+  );
+  const [useImage, setUseImage] = createSignal(true);
 
   // Debounced values
   const [debouncedBezel, setDebouncedBezel] = createSignal(0.3);
@@ -22,7 +27,7 @@ const App: Component = () => {
   const [maxDisplacement, setMaxDisplacement] = createSignal(0);
   const [isComputing, setIsComputing] = createSignal(false);
 
-  const circleSize = 256;
+  const circleSize = 512;
   const filterId = "liquidGlassFilter";
 
   // Debounce functions
@@ -105,7 +110,9 @@ const App: Component = () => {
               scale={scale()}
               xChannelSelector="R"
               yChannelSelector="G"
+              result="displaced"
             />
+            <feGaussianBlur in="displaced" stdDeviation="1" />
           </filter>
 
           {/* Animated Grid Pattern */}
@@ -168,20 +175,50 @@ const App: Component = () => {
           background: "#000",
         }}
       >
-        {/* SVG Background with Grid */}
-        <svg
-          style={{
-            position: "absolute",
-            width: "100%",
-            height: "100%",
-            top: 0,
-            left: 0,
-          }}
-          preserveAspectRatio="xMidYMid slice"
-        >
-          <rect width="100%" height="100%" fill="url(#doubleGradient)" />
-          <rect width="100%" height="100%" fill="url(#gridPattern)" />
-        </svg>
+        {/* Background Layer */}
+        {useImage() && activeImageURL() ? (
+          // Animated Image Background
+          <div
+            style={{
+              position: "absolute",
+              width: "100%",
+              height: "100%",
+              top: 0,
+              left: 0,
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                position: "absolute",
+                width: "110%",
+                height: "110%",
+                top: "-5%",
+                left: "-5%",
+                "background-image": `url(${activeImageURL()})`,
+                "background-size": "cover",
+                "background-position": "center",
+                animation:
+                  "slowZoom 20s ease-in-out infinite alternate, slowPan 30s ease-in-out infinite",
+              }}
+            />
+          </div>
+        ) : (
+          // SVG Gradient Background with Grid
+          <svg
+            style={{
+              position: "absolute",
+              width: "100%",
+              height: "100%",
+              top: 0,
+              left: 0,
+            }}
+            preserveAspectRatio="xMidYMid slice"
+          >
+            <rect width="100%" height="100%" fill="url(#doubleGradient)" />
+            <rect width="100%" height="100%" fill="url(#gridPattern)" />
+          </svg>
+        )}
 
         {/* Glass Circle */}
         <div
@@ -208,9 +245,12 @@ const App: Component = () => {
             "border-radius": "12px",
             color: "white",
             "min-width": "280px",
+            "max-width": "320px",
             "z-index": 20,
             "backdrop-filter": "blur(10px)",
             border: "1px solid rgba(255, 255, 255, 0.1)",
+            "max-height": "90vh",
+            "overflow-y": "auto",
           }}
         >
           <div
@@ -249,6 +289,94 @@ const App: Component = () => {
                 Computing...
               </div>
             )}
+          </div>
+
+          {/* Background Image URL */}
+          <div style={{ "margin-bottom": "20px" }}>
+            <label
+              style={{
+                display: "block",
+                "margin-bottom": "8px",
+                "font-size": "14px",
+                "font-weight": "500",
+              }}
+            >
+              Background Image
+            </label>
+            <input
+              type="text"
+              placeholder="Paste image URL here..."
+              value={imageURL()}
+              onInput={(e) => setImageURL(e.currentTarget.value)}
+              style={{
+                width: "100%",
+                padding: "8px 12px",
+                "border-radius": "6px",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                background: "rgba(255, 255, 255, 0.1)",
+                color: "white",
+                "font-size": "13px",
+                outline: "none",
+                "box-sizing": "border-box",
+              }}
+            />
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+                "margin-top": "8px",
+              }}
+            >
+              <button
+                onClick={() => {
+                  setActiveImageURL(imageURL());
+                  setUseImage(true);
+                }}
+                disabled={!imageURL().trim()}
+                style={{
+                  flex: 1,
+                  padding: "6px 12px",
+                  "border-radius": "6px",
+                  border: "1px solid rgba(255, 255, 255, 0.2)",
+                  background: useImage()
+                    ? "rgba(79, 189, 187, 0.3)"
+                    : "rgba(255, 255, 255, 0.1)",
+                  color: imageURL().trim() ? "white" : "#666",
+                  cursor: imageURL().trim() ? "pointer" : "not-allowed",
+                  "font-size": "12px",
+                  transition: "all 0.2s",
+                }}
+              >
+                Use Image
+              </button>
+              <button
+                onClick={() => setUseImage(false)}
+                style={{
+                  flex: 1,
+                  padding: "6px 12px",
+                  "border-radius": "6px",
+                  border: "1px solid rgba(255, 255, 255, 0.2)",
+                  background: !useImage()
+                    ? "rgba(79, 189, 187, 0.3)"
+                    : "rgba(255, 255, 255, 0.1)",
+                  color: "white",
+                  cursor: "pointer",
+                  "font-size": "12px",
+                  transition: "all 0.2s",
+                }}
+              >
+                Use Gradient
+              </button>
+            </div>
+            <div
+              style={{
+                "font-size": "12px",
+                color: "#999",
+                "margin-top": "4px",
+              }}
+            >
+              Try: https://images.unsplash.com/photo-1579546929518-9e396f3cc809
+            </div>
           </div>
 
           {/* Bezel Width */}
@@ -396,6 +524,19 @@ const App: Component = () => {
           to { transform: rotate(360deg); }
         }
 
+        @keyframes slowZoom {
+          0% { transform: scale(1); }
+          100% { transform: scale(1.1); }
+        }
+
+        @keyframes slowPan {
+          0% { transform: translate(0, 0) scale(1.05); }
+          25% { transform: translate(-2%, 2%) scale(1.08); }
+          50% { transform: translate(0, -2%) scale(1.1); }
+          75% { transform: translate(2%, 0) scale(1.08); }
+          100% { transform: translate(0, 0) scale(1.05); }
+        }
+
         input[type="range"] {
           -webkit-appearance: none;
           appearance: none;
@@ -422,6 +563,19 @@ const App: Component = () => {
           cursor: pointer;
           border-radius: 50%;
           border: none;
+        }
+
+        input[type="text"]:focus {
+          border-color: rgba(79, 189, 187, 0.5);
+          background: rgba(255, 255, 255, 0.15);
+        }
+
+        button:hover:not(:disabled) {
+          background: rgba(79, 189, 187, 0.4);
+        }
+
+        button:active:not(:disabled) {
+          transform: scale(0.98);
         }
       `}</style>
     </div>
