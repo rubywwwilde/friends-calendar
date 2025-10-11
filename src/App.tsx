@@ -84,9 +84,38 @@ const App: Component = () => {
         style={{ position: "absolute", width: 0, height: 0 }}
       >
         <defs>
-          {/* Displacement filter */}
+          {/* Filter WITHOUT blur - for center */}
           <filter
-            id={filterId}
+            id={`${filterId}-sharp`}
+            filterUnits="objectBoundingBox"
+            primitiveUnits="userSpaceOnUse"
+            x="0"
+            y="0"
+            width="1"
+            height="1"
+          >
+            <feImage
+              href={dataURL()}
+              x="0"
+              y="0"
+              width={circleSize}
+              height={circleSize}
+              result="displacementMap"
+              preserveAspectRatio="none"
+            />
+            <feDisplacementMap
+              id="disp"
+              in="SourceGraphic"
+              in2="displacementMap"
+              scale={scale()}
+              xChannelSelector="R"
+              yChannelSelector="G"
+            />
+          </filter>
+
+          {/* Filter WITH blur - for edges */}
+          <filter
+            id={`${filterId}-blur`}
             filterUnits="objectBoundingBox"
             primitiveUnits="userSpaceOnUse"
             x="0"
@@ -220,20 +249,38 @@ const App: Component = () => {
           </svg>
         )}
 
-        {/* Glass Circle */}
+        {/* Blurred edges - clip to outer ring */}
         <div
           style={{
             width: `${circleSize}px`,
             height: `${circleSize}px`,
             "border-radius": "50%",
-            "backdrop-filter": `url(#${filterId})`,
+            "backdrop-filter": `url(#${filterId}-blur)`,
             background: "rgba(255, 255, 255, 0.05)",
             border: "2px solid rgba(255, 255, 255, 0.3)",
-            position: "relative",
+            position: "absolute",
             "z-index": 10,
+            "-webkit-mask":
+              "radial-gradient(circle, transparent 0%, transparent 60%, black 70%, black 100%)",
+            mask: "radial-gradient(circle, transparent 0%, transparent 60%, black 70%, black 100%)",
           }}
         />
 
+        {/* Sharp center - clip to center circle */}
+        <div
+          style={{
+            width: `${circleSize}px`,
+            height: `${circleSize}px`,
+            "border-radius": "50%",
+            "backdrop-filter": `url(#${filterId}-sharp)`,
+            background: "rgba(255, 255, 255, 0.05)",
+            position: "absolute",
+            "z-index": 11,
+            "-webkit-mask":
+              "radial-gradient(circle, black 0%, black 60%, transparent 70%, transparent 100%)",
+            mask: "radial-gradient(circle, black 0%, black 60%, transparent 70%, transparent 100%)",
+          }}
+        />
         {/* Control Panel */}
         <div
           style={{
