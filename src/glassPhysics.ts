@@ -166,3 +166,122 @@ export function imageDataToDataURL(imageData: ImageData): string {
   ctx.putImageData(imageData, 0, 0);
   return canvas.toDataURL();
 }
+
+export function createRoundedRectDisplacementMap(
+  width: number,
+  height: number,
+  borderRadius: number,
+  displacementData: ReturnType<typeof generateDisplacementArray>,
+): ImageData {
+  const imageData = new ImageData(width, height);
+
+  const R = borderRadius;
+  const halfH = height / 2;
+  const cy = halfH;
+  const leftCx = R;
+  const rightCx = width - R;
+
+  const NORMALIZATION_FACTOR = 50; // same as circle map, tune to taste
+  const samples = displacementData.displacements.length;
+
+  const clamp = (v: number, min: number, max: number) =>
+    Math.max(min, Math.min(max, v));
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const pixelIndex = (y * width + x) * 4;
+
+      // Determine whether we're inside the pill
+      // Inside if:
+      // - in the central rectangle band (R <= x <= width - R)
+      // - or inside either cap circle
+      const dxL = x - leftCx;
+      const dxR = x - rightCx;
+      const dy = y - cy;
+
+      const inCentralBand = x >= R && x <= width - R;
+      const inLeftDisk = dxL * dxL + dy * dy <= R * R;
+      const inRightDisk = dxR * dxR + dy * dy <= R * R;
+
+      const inside = inCentralBand || inLeftDisk || inRightDisk;
+
+      // Default: no displacement outside
+      let r = 128;
+      let g = 128;
+
+      if (inside) {
+        // Candidates: distance to top, bottom, left cap arc, right cap arc
+        // We'll pick the nearest boundary and use its inward normal.
+        let bestDist = Infinity;
+        let nx = 0;
+        let ny = 0;
+        let denom = halfH; // default if we pick top/bottom
+
+        // Top edge (y = 0), inward normal is +Y
+        const dTop = y;
+        if (dTop < bestDist) {
+          bestDist = dTop;
+          nx = 0;
+          ny = 1;
+          denom = halfH;
+        }
+
+        // Bottom edge (y = height), inward normal is -Y
+        const dBottom = height - 1 - y; // pixel-centered; you can also use (height - y)
+        if (dBottom < bestDist) {
+          bestDist = dBottom;
+          nx = 0;
+          ny = -1;
+          denom = halfH;
+        }
+
+        // Left cap (circle of radius R centered at (R, cy))
+        const dL = Math.hypot(dxL, dy);
+        const dLeftToArc = Math.abs(R - dL); // distance to the circle boundary
+        if (dLeftToArc < bestDist) {
+          bestDist = dLeftToArc;
+          denom = R;
+          const len = dL || 1;
+          // Inward normal = toward circle center
+          nx = -(dxL / len);
+          ny = -(dy / len);
+        }
+
+        // Right cap (circle of radius R centered at (width - R, cy))
+        const dR = Math.hypot(dxR, dy);
+        const dRightToArc = Math.abs(R - dR);
+        if (dRightToArc < bestDist) {
+          bestDist = dRightToArc;
+          denom = R;
+          const len = dR || 1;
+          nx = -(dxR / len);
+          ny = -(dy / len);
+        }
+
+        // Convert distance to normalized 0..1 from edge to "center"
+        const normalizedDistance = clamp(bestDist / denom, 0, 1);
+
+        // Sample the displacement magnitude profile
+        const idx = Math.floor(normalizedDistance * (samples - 1));
+        const magnitude = displacementData.displacements[idx] || 0;
+
+        // Normalize magnitude to -1..1 space we encode into RG
+        const normalizedMagnitude = magnitude / NORMALIZATION_FACTOR;
+
+        // Apply inward normal
+        const dispX = nx * normalizedMagnitude;
+        const dispY = ny * normalizedMagnitude;
+
+        r = Math.round(clamp(128 + dispX * 127, 0, 255));
+        g = Math.round(clamp(128 + dispY * 127, 0, 255));
+      }
+
+      imageData.data[pixelIndex + 0] = r;
+      imageData.data[pixelIndex + 1] = g;
+      imageData.data[pixelIndex + 2] = 128; // neutral blue
+      imageData.data[pixelIndex + 3] = 255; // opaque
+    }
+  }
+
+  return imageData;
+}

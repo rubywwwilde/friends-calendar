@@ -13,7 +13,7 @@ const Background: Component<BackgroundProps> = (props) => {
         // SVG Gradient Background with Grid
         <svg
           style={{
-            position: "absolute",
+            position: "fixed",
             width: "100%",
             height: "100%",
             top: 0,
@@ -29,7 +29,7 @@ const Background: Component<BackgroundProps> = (props) => {
       {/* Animated Image Background */}
       <div
         style={{
-          position: "absolute",
+          position: "fixed",
           width: "100%",
           height: "100%",
           top: 0,

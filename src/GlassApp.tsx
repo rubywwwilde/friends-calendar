@@ -9,7 +9,7 @@ import {
   generateDisplacementArray,
   imageDataToDataURL,
 } from "./glassPhysics";
-import SvgFilters from "./SvgFilters";
+import SvgFilters from "./GlassSvgFilters";
 
 const App: Component = () => {
   const [bezelWidth, setBezelWidth] = createSignal(0.3);
